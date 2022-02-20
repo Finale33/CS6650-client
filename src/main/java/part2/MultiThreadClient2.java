@@ -133,11 +133,13 @@ public class MultiThreadClient2 {
         long meanLatency = PostProcessing.getMean(latencyList);
         long medianLatency = PostProcessing.getMedian(latencyList);
         File csvFile = PostProcessing.getCSVFile(records);
+        long percentile99 = PostProcessing.percentile(latencyList, 99);
 
         System.out.println("the min latency is " + minLatency);
         System.out.println("the max latency is " + maxLatency);
         System.out.println("the mean latency is " + meanLatency);
         System.out.println("the median latency is " + medianLatency);
+        System.out.println("the 99 percentile of latencies is " + percentile99);
     }
 }
 

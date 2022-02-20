@@ -76,6 +76,12 @@ public class PostProcessing {
         return curr.get(curr.size() / 2);
     }
 
+    public static long percentile(List<Long> latencies, double percentile) {
+        int index = (int) Math.ceil(percentile / 100.0 * latencies.size());
+        return latencies.get(index-1);
+    }
+
+
 
 //    mean response time (millisecs), doing so when done
 //    median response time (millisecs), doing so when done
