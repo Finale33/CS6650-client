@@ -16,7 +16,7 @@ public class MultiThreadClient2 {
     static int numSkier;
     static int numRun = 10;
     static int liftNum = 40;
-    static String basePath = "http://35.88.244.109:8080/cs6500_lab_war/";
+    static String basePath = "http://cs6650-load-balancer-1123807544.us-west-2.elb.amazonaws.com:8080/cs6500-lab_war/";
 
     static DateTimeFormatter formatter = DateTimeFormatter.ISO_DATE_TIME;
     static Thread[] threadPool1;
@@ -100,16 +100,7 @@ public class MultiThreadClient2 {
         }
         executePhase3();
 
-//        // wait until all threads to finish
-//        for (int i = 0; i < threadPool1.length; i++) {
-//            threadPool1[i].join();
-//        }
-//        for (int i = 0; i < threadPool2.length; i++) {
-//            threadPool2[i].join();
-//        }
-//        for (int i = 0; i < threadPool3.length; i++) {
-//            threadPool3[i].join();
-//        }
+        // wait until all threads to finish
         while (phase1FinishedThreadNum.get() < numThread / 4 || phase2FinishedThreadNum.get() < numThread || phase3FinishedThreadNum.get() < (numThread / 10)) {
             continue;
         }

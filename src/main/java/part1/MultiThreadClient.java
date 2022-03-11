@@ -7,6 +7,8 @@ import io.swagger.client.model.*;
 import java.io.InputStreamReader;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MultiThreadClient {
@@ -14,16 +16,9 @@ public class MultiThreadClient {
     static int numSkier;
     static int numRun = 10;
     static int liftNum = 40;
-    static String basePath = "http://35.88.244.109:8080/cs6500_lab_war/";
-
-    static Thread[] threadPool1;
-    static Thread[] threadPool2;
-    static Thread[] threadPool3;
+    static String basePath = "http://cs6650-load-balancer-1123807544.us-west-2.elb.amazonaws.com:8080/cs6500-lab_war/";
 
     // these variables will be accessed by different threads
-    static AtomicInteger phase1FinishedThreadNum = new AtomicInteger(0);
-    static AtomicInteger phase2FinishedThreadNum = new AtomicInteger(0);
-    static AtomicInteger phase3FinishedThreadNum = new AtomicInteger(0);
     static AtomicInteger numOfFailures = new AtomicInteger(0);
     static AtomicInteger numOfSuccess = new AtomicInteger(0);
 
@@ -40,81 +35,72 @@ public class MultiThreadClient {
         numRun = scanner.nextInt();
     }
 
-    private static void executePhase1() {
+    private static void executePhase1(CountDownLatch completed1, CountDownLatch completed) {
         int phase1NumThread = numThread / 4;
-        threadPool1 = new Thread[phase1NumThread];
+        Thread[] threadPool1 = new Thread[phase1NumThread];
         int skierNumGroup = numSkier / phase1NumThread;
         for (int i = 0; i < phase1NumThread; i++) {
             int skierIdBegin = i * skierNumGroup;
             int skierIdEnd = (i + 1) * skierNumGroup - 1;
-            threadPool1[i] = new Thread(new MyRunnable(basePath, skierIdBegin, skierIdEnd, liftNum, (int) Math.ceil((numRun * 0.2) * skierNumGroup), 0, 90, 1));
+            threadPool1[i] = new Thread(new MyRunnable(basePath, skierIdBegin, skierIdEnd, liftNum, (int) Math.ceil((numRun * 0.2) * skierNumGroup), 0, 90, completed1, completed));
             threadPool1[i].start();
         }
     }
 
-    private static void executePhase2() {
+    private static void executePhase2(CountDownLatch completed2, CountDownLatch completed) {
         int skierNumGroup = numSkier / numThread;
-        threadPool2 = new Thread[numThread];
+        Thread[] threadPool2 = new Thread[numThread];
         for (int i = 0; i < numThread; i++) {
             int skierIdBegin = i * skierNumGroup;
             int skierIdEnd = (i + 1) * skierNumGroup - 1;
-            threadPool2[i] = new Thread(new MyRunnable(basePath, skierIdBegin, skierIdEnd, liftNum, (int) Math.ceil((numRun * 0.6) * skierNumGroup), 91, 360, 2));
+            threadPool2[i] = new Thread(new MyRunnable(basePath, skierIdBegin, skierIdEnd, liftNum, (int) Math.ceil((numRun * 0.6) * skierNumGroup), 91, 360, completed2, completed));
             threadPool2[i].start();
         }
     }
 
-    private static void executePhase3() {
+    private static void executePhase3(CountDownLatch completed3, CountDownLatch completed) {
         int phase3NumThread = numThread / 10;
-        threadPool3 = new Thread[phase3NumThread];
+        Thread[] threadPool3 = new Thread[phase3NumThread];
         int skierNumGroup = numSkier / numThread;
         for (int i = 0; i < phase3NumThread; i++) {
             int skierIdBegin = i * skierNumGroup;
             int skierIdEnd = (i + 1) * skierNumGroup - 1;
-            threadPool3[i] = new Thread(new MyRunnable(basePath, skierIdBegin, skierIdEnd, liftNum, (int) Math.ceil((numRun * 0.1) * skierNumGroup), 361, 420, 3));
+            threadPool3[i] = new Thread(new MyRunnable(basePath, skierIdBegin, skierIdEnd, liftNum, (int) Math.ceil((numRun * 0.1) * skierNumGroup), 361, 420, completed3, completed));
             threadPool3[i].start();
         }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         // read configs from command line
         getParams();
 
         Timestamp before = new Timestamp(System.currentTimeMillis());
+        CountDownLatch completed = new CountDownLatch(numThread / 4 + numThread + numThread / 10);
 
         // execute phase 1
-        executePhase1();
+        System.out.println("executing phase 1");
+        CountDownLatch completed1 = new CountDownLatch((int)(0.2 * (numThread / 4)));
+        executePhase1(completed1, completed);
+        completed1.await();
 
         // execute phase 2
-        while (phase1FinishedThreadNum.get() < 0.2 * (numThread / 4)) {
-            continue;
-        }
-        executePhase2();
+        System.out.println("executing phase 2");
+        CountDownLatch completed2 = new CountDownLatch((int)(0.2 * (numThread)));
+        executePhase2(completed2, completed);
+        completed2.await();
 
         // execute phase 3
-        while (phase2FinishedThreadNum.get() < 0.2 * numThread) {
-            continue;
-        }
-        executePhase3();
-
-//        // wait until all threads to finish
-//        for (int i = 0; i < threadPool1.length; i++) {
-//            threadPool1[i].join();
-//        }
-//        for (int i = 0; i < threadPool2.length; i++) {
-//            threadPool2[i].join();
-//        }
-//        for (int i = 0; i < threadPool3.length; i++) {
-//            threadPool3[i].join();
-//        }
-        while (phase1FinishedThreadNum.get() < (numThread / 4) || phase2FinishedThreadNum.get() < numThread || phase3FinishedThreadNum.get() < (numThread / 10)) {
-            continue;
-        }
+        System.out.println("executing phase 3");
+        CountDownLatch completed3 = new CountDownLatch(numThread / 4 + numThread + numThread / 10);
+        executePhase3(completed3, completed);
+        completed.await();
 
         Timestamp after = new Timestamp(System.currentTimeMillis());
         long wallTime = (after.getTime() - before.getTime()) / 1000;
         int totalReq = numOfFailures.get() + numOfSuccess.get();
         long throughput = wallTime == 0 ? totalReq : totalReq / wallTime;
 
+        System.out.println("The result of running " + numThread + " threads of " + numSkier + " skiers are:");
         System.out.println("The number of successful requests are: " + numOfSuccess);
         System.out.println("The number of failed requests are: " + numOfFailures);
         System.out.println("the total run time is " + wallTime + " seconds.");
@@ -131,9 +117,10 @@ class MyRunnable implements Runnable {
     private final int numOfTrialsLimit = 5;
     private final int startTime;
     private final int endTime;
-    private final int phase;
+    private CountDownLatch completed;
+    private CountDownLatch completedAll;
 
-    MyRunnable(String basePath, int skierIdBegin, int skierIdEnd, int liftNum, int iterateNum, int startTime, int endTime, int phase) {
+    MyRunnable(String basePath, int skierIdBegin, int skierIdEnd, int liftNum, int iterateNum, int startTime, int endTime, CountDownLatch completed, CountDownLatch completedAll) {
         this.skierIdBegin = skierIdBegin;
         this.skierIdEnd = skierIdEnd;
         this.iterateNum = iterateNum;
@@ -141,7 +128,8 @@ class MyRunnable implements Runnable {
         this.basePath = basePath;
         this.startTime = startTime;
         this.endTime = endTime;
-        this.phase = phase;
+        this.completed = completed;
+        this.completedAll = completedAll;
     }
 
     @Override
@@ -151,6 +139,8 @@ class MyRunnable implements Runnable {
         for (int i = 0; i < this.iterateNum; i++) {
             SkiersApi apiInstance = new SkiersApi();
             apiInstance.getApiClient().setBasePath(basePath);
+            apiInstance.getApiClient().getHttpClient().setConnectTimeout(600000, TimeUnit.MILLISECONDS);
+            apiInstance.getApiClient().getHttpClient().setReadTimeout(600000, TimeUnit.MILLISECONDS);
             LiftRide liftRideBody = new LiftRide();
             liftRideBody.setLiftID(random.nextInt(liftNum));
             liftRideBody.setTime(random.nextInt(endTime - startTime) + startTime);
@@ -174,13 +164,7 @@ class MyRunnable implements Runnable {
             }
         }
 
-        if (phase == 1) {
-            MultiThreadClient.phase1FinishedThreadNum.getAndIncrement();
-        }
-        if (phase == 2) {
-            MultiThreadClient.phase2FinishedThreadNum.getAndIncrement();
-        } else {
-            MultiThreadClient.phase3FinishedThreadNum.getAndIncrement();
-        }
+        this.completedAll.countDown();
+        this.completed.countDown();
     }
 }
