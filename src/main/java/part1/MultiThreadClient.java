@@ -16,7 +16,7 @@ public class MultiThreadClient {
     static int numSkier;
     static int numRun = 10;
     static int liftNum = 40;
-    static String basePath = "http://cs6650-load-balancer-1123807544.us-west-2.elb.amazonaws.com:8080/cs6500-lab_war/";
+    static String basePath = "http://34.214.244.70:8080/cs6500-lab_war/";
 
     // these variables will be accessed by different threads
     static AtomicInteger numOfFailures = new AtomicInteger(0);
@@ -146,9 +146,15 @@ class MyRunnable implements Runnable {
             liftRideBody.setTime(random.nextInt(endTime - startTime) + startTime);
             liftRideBody.setWaitTime(random.nextInt(10));
             int numOfTrials = 0;
+            int waitTime = 100;
             try {
                 // handle failure response
+                // adding in exponential backoff
                 while (numOfTrials <= numOfTrialsLimit) {
+                    if (numOfTrials > 0) {
+                        waitTime = waitTime * 2;
+                        wait(waitTime + (int)(100 * Math.random()));
+                    }
                     ApiResponse response = apiInstance.writeNewLiftRideWithHttpInfo(liftRideBody, 1, "1", "1", random.nextInt(skierIdEnd - skierIdBegin) + skierIdBegin);
                     numOfTrials++;
                     if (response.getStatusCode() == 201) {
@@ -159,8 +165,9 @@ class MyRunnable implements Runnable {
                 if (numOfTrials > numOfTrialsLimit){
                     MultiThreadClient.numOfFailures.getAndIncrement();
                 }
-            } catch (ApiException e) {
+            } catch (ApiException | InterruptedException e) {
                 e.printStackTrace();
+                MultiThreadClient.numOfFailures.getAndIncrement();
             }
         }
 
