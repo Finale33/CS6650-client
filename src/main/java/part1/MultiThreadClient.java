@@ -16,7 +16,7 @@ public class MultiThreadClient {
     static int numSkier;
     static int numRun = 10;
     static int liftNum = 40;
-    static String basePath = "http://34.214.244.70:8080/cs6500-lab_war/";
+    static String basePath = "http://18.236.230.247:8080/cs6500-lab_war/";
 
     // these variables will be accessed by different threads
     static AtomicInteger numOfFailures = new AtomicInteger(0);
@@ -155,7 +155,7 @@ class MyRunnable implements Runnable {
                         waitTime = waitTime * 2;
                         wait(waitTime + (int)(100 * Math.random()));
                     }
-                    ApiResponse response = apiInstance.writeNewLiftRideWithHttpInfo(liftRideBody, 1, "1", "1", random.nextInt(skierIdEnd - skierIdBegin) + skierIdBegin);
+                    ApiResponse response = apiInstance.writeNewLiftRideWithHttpInfo(liftRideBody, 1, "1", "3", random.nextInt(skierIdEnd - skierIdBegin) + skierIdBegin);
                     numOfTrials++;
                     if (response.getStatusCode() == 201) {
                         MultiThreadClient.numOfSuccess.getAndIncrement();
